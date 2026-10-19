@@ -1,0 +1,234 @@
+{
+  "meta": {
+    "title": "Freelance Marketplace",
+    "description": "Freelance marketplace for Kyrgyzstan, the CIS and Europe"
+  },
+  "nav": {
+    "brand": "Jumush",
+    "projects": "Projects",
+    "newProject": "Post a project",
+    "dashboard": "Dashboard",
+    "moderation": "Moderation",
+    "admin": "Admin",
+    "login": "Log in",
+    "register": "Sign up",
+    "logout": "Log out",
+    "settings": "Settings"
+  },
+  "home": {
+    "title": "Find a freelancer or find work",
+    "subtitle": "Safe deal: the client's money is held and released to the freelancer only after the work is accepted.",
+    "ctaEmployer": "Post a project",
+    "ctaFreelancer": "Browse projects",
+    "how1": "A client posts a task",
+    "how2": "Freelancers send proposals with their price and deadline",
+    "how3": "The client picks a freelancer and pays for the order",
+    "how4": "Once the work is accepted, the freelancer gets paid"
+  },
+  "projects": {
+    "title": "Projects",
+    "search": "Search projects",
+    "allCategories": "All categories",
+    "budget": "Budget",
+    "noBudget": "Negotiable",
+    "deadline": "Deadline: {days} days",
+    "proposals": "Proposals: {count}",
+    "empty": "No projects yet",
+    "employer": "Client",
+    "close": "Close project",
+    "report": "Report",
+    "reportReason": "Describe the reason for the report",
+    "reportSent": "Report sent to moderators",
+    "status": {
+      "OPEN": "Open",
+      "IN_PROGRESS": "In progress",
+      "CLOSED": "Closed",
+      "HIDDEN": "Hidden by a moderator"
+    },
+    "find": "Search"
+  },
+  "newProject": {
+    "title": "New project",
+    "fieldTitle": "Title",
+    "fieldDescription": "Task description",
+    "fieldCategory": "Category",
+    "fieldBudget": "Budget, KGS (optional)",
+    "fieldDeadline": "Deadline, days (optional)",
+    "submit": "Publish",
+    "onlyEmployers": "Only clients can post projects."
+  },
+  "proposals": {
+    "title": "Proposals",
+    "send": "Send proposal",
+    "coverLetter": "Cover letter",
+    "price": "Price, KGS",
+    "deadlineDays": "Deadline, days",
+    "commissionHint": "Platform fee {rate}% — you will receive {payout}",
+    "accept": "Hire this freelancer",
+    "withdraw": "Withdraw",
+    "sent": "Proposal sent",
+    "loginToApply": "Log in as a freelancer to send a proposal",
+    "status": {
+      "PENDING": "Pending",
+      "ACCEPTED": "Accepted",
+      "REJECTED": "Rejected",
+      "WITHDRAWN": "Withdrawn"
+    }
+  },
+  "orders": {
+    "title": "Order",
+    "amount": "Order amount",
+    "commission": "Platform fee ({rate}%)",
+    "payout": "You will receive",
+    "deadline": "Due",
+    "autoAccept": "Auto-accept",
+    "history": "History",
+    "chat": "Order messages",
+    "chatHint": "Do not share contacts or arrange payment outside the platform: it breaks the rules and removes safe-deal protection.",
+    "send": "Send",
+    "fund": "Confirm payment (manual)",
+    "submit": "Deliver work",
+    "revision": "Request changes",
+    "accept": "Accept work",
+    "cancel": "Cancel order",
+    "dispute": "Open a dispute",
+    "disputeReason": "Describe the dispute",
+    "review": "Leave a review",
+    "rating": "Rating",
+    "awaitingPaymentHint": "Online payment is coming soon. For now an administrator confirms payment.",
+    "status": {
+      "AWAITING_PAYMENT": "Awaiting payment",
+      "IN_PROGRESS": "In progress",
+      "SUBMITTED": "Under review",
+      "REVISION": "Changes requested",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled",
+      "DISPUTED": "Disputed"
+    },
+    "parties": "Parties",
+    "noMessages": "No messages yet",
+    "messagePlaceholder": "Message…"
+  },
+  "auth": {
+    "loginTitle": "Log in",
+    "registerTitle": "Sign up",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "At least 8 characters",
+    "name": "Name or company name",
+    "role": "I want to",
+    "roleEmployer": "Hire freelancers (client)",
+    "roleFreelancer": "Find work (freelancer)",
+    "country": "Country",
+    "acceptPrefix": "I accept the",
+    "and": "and",
+    "acceptPrivacy": "I consent to the processing of my personal data under the",
+    "adult": "I am 18 or older",
+    "submitLogin": "Log in",
+    "submitRegister": "Create account",
+    "noAccount": "No account?",
+    "haveAccount": "Already have an account?",
+    "errors": {
+      "invalid_credentials": "Wrong email or password",
+      "account_blocked": "Your account is blocked. Please contact support.",
+      "email_taken": "This email is already registered",
+      "legal_docs_required": "You need to accept all documents",
+      "generic": "Something went wrong. Please try again.",
+      "wrong_password": "Current password is incorrect"
+    }
+  },
+  "consent": {
+    "title": "We have updated our documents",
+    "body": "To keep using the site, please review and accept the new versions:",
+    "accept": "I accept"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "myProjects": "My projects",
+    "myProposals": "My proposals",
+    "myOrders": "My orders",
+    "empty": "Nothing here yet"
+  },
+  "moderation": {
+    "title": "Moderation",
+    "reports": "Reports",
+    "disputes": "Disputes",
+    "audit": "Audit log",
+    "hideProject": "Hide project",
+    "unhideProject": "Restore project",
+    "blockUser": "Block",
+    "unblockUser": "Unblock",
+    "dismiss": "Dismiss",
+    "actioned": "Action taken",
+    "reason": "Reason",
+    "resolveEmployer": "For the client (refund)",
+    "resolveFreelancer": "For the freelancer (payout)",
+    "resolveSplit": "Partial refund",
+    "resolution": "Decision (visible to both parties)",
+    "refund": "Refund amount, KGS",
+    "empty": "Nothing open",
+    "status": {
+      "ACTIVE": "active",
+      "BLOCKED": "blocked"
+    },
+    "user": "User",
+    "project": "Project"
+  },
+  "admin": {
+    "title": "Administration",
+    "users": "Users",
+    "stats": "Statistics",
+    "search": "Search by email or name",
+    "role": "Role",
+    "turnover": "Turnover of completed orders",
+    "revenue": "Platform commission",
+    "completed": "Completed orders",
+    "roles": {
+      "ADMIN": "Administrator",
+      "MODERATOR": "Moderator",
+      "EMPLOYER": "Client",
+      "FREELANCER": "Freelancer"
+    },
+    "usersByRole": "Users by role"
+  },
+  "legal": {
+    "terms": "Terms of Use",
+    "offer": "Public Offer",
+    "privacy": "Privacy Policy",
+    "rules": "Marketplace Rules",
+    "safe-deal": "Safe Deal Rules",
+    "cookies": "Cookie Policy",
+    "version": "Version of {version}",
+    "draftWarning": "Draft. This document must be reviewed by a lawyer before launch."
+  },
+  "footer": {
+    "rights": "© {year} Jumush. The platform is an information intermediary and is not a party to deals between users.",
+    "cookieNotice": "We use cookies that are necessary for the site to work.",
+    "cookieOk": "Got it"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "notFound": "Not found",
+    "back": "Back",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
+  },
+  "settings": {
+    "title": "Settings",
+    "email": "Login email",
+    "currentEmail": "Current",
+    "newEmail": "New email",
+    "currentPassword": "Current password",
+    "saveEmail": "Change email",
+    "emailChanged": "Email changed",
+    "password": "Password",
+    "passwordHint": "Changing your password signs you out on all other devices.",
+    "newPassword": "New password (at least 8 characters)",
+    "repeatPassword": "Repeat new password",
+    "savePassword": "Change password",
+    "passwordChanged": "Password changed. Other sessions were signed out.",
+    "passwordsDontMatch": "Passwords do not match"
+  }
+}

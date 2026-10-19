@@ -1,0 +1,22 @@
+{
+  "name": "freelance-marketplace",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @fm/shared",
+    "dev:api": "npm run dev -w @fm/api",
+    "dev:web": "npm run dev -w @fm/web",
+    "build": "npm run build:shared && npm run build -w @fm/api && npm run build -w @fm/web",
+    "test": "npm run test -w @fm/shared",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "npm run prisma:migrate -w @fm/api",
+    "db:seed": "npm run prisma:seed -w @fm/api"
+  },
+  "overrides": {
+    "postcss": "^8.5.12",
+    "deepmerge-ts": "^8.0.0"
+  }
+}

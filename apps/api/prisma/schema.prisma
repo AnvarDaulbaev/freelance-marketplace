@@ -1,0 +1,418 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Money is stored as integers in minor units (tyiyn for KGS) to avoid
+// floating-point errors. Every amount carries a currency.
+
+enum Role {
+  ADMIN
+  MODERATOR
+  EMPLOYER
+  FREELANCER
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum Locale {
+  ru
+  en
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  // Bumped on password change; tokens carrying an older value are rejected.
+  sessionVersion Int    @default(0)
+  name         String
+  role         Role
+  status       UserStatus @default(ACTIVE)
+  blockReason  String?
+  blockedById  String?
+  blockedByRole Role?
+  locale       Locale     @default(ru)
+  country      String?    @db.Char(2)
+  bio          String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  projects        Project[]       @relation("EmployerProjects")
+  proposals       Proposal[]
+  ordersAsEmployer   Order[]      @relation("EmployerOrders")
+  ordersAsFreelancer Order[]      @relation("FreelancerOrders")
+  consents        UserConsent[]
+  reportsFiled    Report[]        @relation("ReportAuthor")
+  reportsAgainst  Report[]        @relation("ReportTargetUser")
+  auditLogs       AuditLog[]
+  reviewsWritten  Review[]        @relation("ReviewAuthor")
+  reviewsReceived Review[]        @relation("ReviewTarget")
+  messages        Message[]
+  wallets         Wallet[]
+  payouts         Payout[]
+  payoutMethods   PayoutMethod[]
+}
+
+// --- Legal: proof that a user accepted a specific version of a document ---
+
+model UserConsent {
+  id         String   @id @default(cuid())
+  userId     String
+  document   String // LegalDoc key from @fm/shared, e.g. "terms"
+  version    String
+  locale     Locale
+  ip         String?
+  userAgent  String?
+  acceptedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, document, version])
+}
+
+// --- Marketplace ---
+
+model Category {
+  id       String    @id @default(cuid())
+  slug     String    @unique
+  nameRu   String
+  nameEn   String
+  parentId String?
+  parent   Category? @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  projects Project[]
+}
+
+enum ProjectStatus {
+  OPEN // visible, accepting proposals
+  IN_PROGRESS // a proposal was accepted, order exists
+  CLOSED // finished or closed by employer
+  HIDDEN // hidden by a moderator
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  employerId     String
+  categoryId     String?
+  title          String
+  description    String
+  budgetMinor    Int?
+  currency       String        @default("KGS") @db.Char(3)
+  deadlineDays   Int?
+  status         ProjectStatus @default(OPEN)
+  moderationNote String?
+  hiddenById     String?
+  hiddenByRole   Role?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  employer  User       @relation("EmployerProjects", fields: [employerId], references: [id])
+  category  Category?  @relation(fields: [categoryId], references: [id])
+  proposals Proposal[]
+  order     Order?
+  reports   Report[]
+
+  @@index([status, createdAt])
+  @@index([employerId, createdAt])
+  // Trigram indexes for the public ILIKE search (pg_trgm, created in migration audit2_roles_indexes).
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Project_title_trgm_idx")
+  @@index([description(ops: raw("gin_trgm_ops"))], type: Gin, map: "Project_description_trgm_idx")
+}
+
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+model Proposal {
+  id           String         @id @default(cuid())
+  projectId    String
+  freelancerId String
+  coverLetter  String
+  priceMinor   Int
+  currency     String         @default("KGS") @db.Char(3)
+  deadlineDays Int
+  status       ProposalStatus @default(PENDING)
+  createdAt    DateTime       @default(now())
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancer User    @relation(fields: [freelancerId], references: [id])
+  order      Order?
+
+  @@unique([projectId, freelancerId])
+  @@index([freelancerId, createdAt])
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT // created from accepted proposal, employer must fund escrow
+  IN_PROGRESS // escrow funded, freelancer working
+  SUBMITTED // freelancer delivered, employer reviewing
+  REVISION // employer asked for changes
+  COMPLETED // accepted (manually or automatically), payout released
+  CANCELLED // cancelled, escrow refunded
+  DISPUTED // under moderator arbitration
+}
+
+model Order {
+  id           String      @id @default(cuid())
+  projectId    String      @unique
+  proposalId   String      @unique
+  employerId   String
+  freelancerId String
+  status       OrderStatus @default(AWAITING_PAYMENT)
+
+  // Commission snapshot, fixed when the order is created so later tier
+  // changes never affect existing orders. Charged to the freelancer.
+  amountMinor     Int
+  currency        String @db.Char(3)
+  commissionBps   Int
+  commissionMinor Int
+  payoutMinor     Int
+
+  deadlineAt   DateTime?
+  submittedAt  DateTime?
+  autoAcceptAt DateTime? // set on submit; employer silence = acceptance
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project    Project       @relation(fields: [projectId], references: [id])
+  proposal   Proposal      @relation(fields: [proposalId], references: [id])
+  employer   User          @relation("EmployerOrders", fields: [employerId], references: [id])
+  freelancer User          @relation("FreelancerOrders", fields: [freelancerId], references: [id])
+  events     OrderEvent[]
+  messages   Message[]
+  dispute    Dispute?
+  reviews    Review[]
+  payments   Payment[]
+  ledger     LedgerEntry[]
+
+  @@index([status, autoAcceptAt])
+  @@index([employerId, updatedAt])
+  @@index([freelancerId, updatedAt])
+}
+
+model OrderEvent {
+  id        String      @id @default(cuid())
+  orderId   String
+  actorId   String?
+  from      OrderStatus?
+  to        OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+// Chat inside an order. Kept on-platform as evidence for disputes.
+model Message {
+  id        String   @id @default(cuid())
+  orderId   String
+  authorId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  author User  @relation(fields: [authorId], references: [id])
+
+  @@index([orderId, createdAt])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String
+  authorId  String
+  targetId  String
+  rating    Int // 1..5
+  text      String?
+  createdAt DateTime @default(now())
+
+  order  Order @relation(fields: [orderId], references: [id])
+  author User  @relation("ReviewAuthor", fields: [authorId], references: [id])
+  target User  @relation("ReviewTarget", fields: [targetId], references: [id])
+
+  @@unique([orderId, authorId])
+}
+
+// --- Moderation ---
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED_FOR_EMPLOYER // full refund
+  RESOLVED_FOR_FREELANCER // full payout
+  RESOLVED_SPLIT // partial refund
+}
+
+model Dispute {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  openedById        String
+  reason            String
+  status            DisputeStatus @default(OPEN)
+  resolvedById      String?
+  resolution        String?
+  refundMinor       Int? // for RESOLVED_SPLIT
+  createdAt         DateTime      @default(now())
+  resolvedAt        DateTime?
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+enum ReportStatus {
+  OPEN
+  ACTIONED
+  DISMISSED
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  authorId     String
+  targetUserId String?
+  projectId    String?
+  reason       String
+  status       ReportStatus @default(OPEN)
+  handledById  String?
+  createdAt    DateTime     @default(now())
+  handledAt    DateTime?
+
+  author     User     @relation("ReportAuthor", fields: [authorId], references: [id])
+  targetUser User?    @relation("ReportTargetUser", fields: [targetUserId], references: [id])
+  project    Project? @relation(fields: [projectId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+// Every staff action and sensitive change. Needed to answer complaints and
+// regulators: who did what, when.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String // e.g. "user.block", "project.hide", "role.change"
+  entityType String
+  entityId   String
+  data       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+// --- Payments (data model only, provider integration comes later) ---
+//
+// Escrow funds are meant to be held by a licensed payment provider; these
+// tables mirror the provider's state and keep our own double-entry ledger.
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  orderId      String
+  payerId      String
+  provider     String // "elsom", "mbank", "odengi", "stripe", ...
+  externalId   String?
+  amountMinor  Int
+  currency     String        @db.Char(3)
+  status       PaymentStatus @default(PENDING)
+  rawPayload   Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@unique([provider, externalId])
+}
+
+enum WalletType {
+  USER // freelancer earnings available for payout
+  ESCROW // funds held for an order (platform-level account)
+  PLATFORM_REVENUE // our commission
+}
+
+model Wallet {
+  id           String     @id @default(cuid())
+  userId       String?
+  type         WalletType
+  currency     String     @db.Char(3)
+  // Cached sum of ledger entries; the ledger is the source of truth.
+  balanceMinor Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  user    User?         @relation(fields: [userId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([userId, type, currency])
+}
+
+// Double-entry: every movement writes entries with the same transactionId
+// whose amounts sum to zero (debit negative, credit positive).
+model LedgerEntry {
+  id            String   @id @default(cuid())
+  transactionId String
+  walletId      String
+  orderId       String?
+  amountMinor   Int
+  currency      String   @db.Char(3)
+  kind          String // "escrow_fund", "commission", "release", "refund", "payout"
+  createdAt     DateTime @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id])
+  order  Order? @relation(fields: [orderId], references: [id])
+
+  @@index([transactionId])
+  @@index([walletId, createdAt])
+}
+
+model PayoutMethod {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String // "card", "elsom", "mbank", "bank_transfer"
+  label     String // masked, e.g. "Visa •••• 4242"
+  token     String? // provider token, never the raw card number
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  payouts Payout[]
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model Payout {
+  id          String       @id @default(cuid())
+  userId      String
+  methodId    String
+  amountMinor Int
+  feeMinor    Int          @default(0)
+  currency    String       @db.Char(3)
+  status      PayoutStatus @default(REQUESTED)
+  externalId  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user   User         @relation(fields: [userId], references: [id])
+  method PayoutMethod @relation(fields: [methodId], references: [id])
+}

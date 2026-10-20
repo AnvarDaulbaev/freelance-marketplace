@@ -1,6 +1,7 @@
 export * from './roles';
 export * from './commission';
 export * from './legal';
+export * from './contacts';
 
 export const LOCALES = ['ru', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];

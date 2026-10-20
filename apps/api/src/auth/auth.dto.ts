@@ -1,4 +1,4 @@
-import { ArrayMaxSize, Equals, IsArray, IsEmail, IsIn, IsOptional, IsString, Length, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, Equals, IsArray, IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 import { SELF_SIGNUP_ROLES } from '@fm/shared';
 
 export class RegisterDto {
@@ -11,8 +11,10 @@ export class RegisterDto {
   @MaxLength(128)
   password: string;
 
+  /** No digits of any script (also ①, ٣, ５): names were used to pass phone numbers. */
   @IsString()
   @Length(2, 80)
+  @Matches(/^\P{N}*$/u, { message: 'name_has_digits' })
   name: string;
 
   @IsIn(SELF_SIGNUP_ROLES)

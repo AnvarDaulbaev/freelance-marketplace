@@ -3,11 +3,12 @@ import {
   NotFoundException, Param, Post,
 } from '@nestjs/common';
 import { calculateCommission } from '@fm/shared';
-import { OrderStatus, ProjectStatus, ProposalStatus, Role } from '@prisma/client';
+import { ContentSource, OrderStatus, ProjectStatus, ProposalStatus, Role } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { IsInt, IsString, Length, Max, Min } from 'class-validator';
 import { MAX_AMOUNT_SOM } from '../common/limits';
 import { AuditService } from '../common/audit.service';
+import { ContentGuardService } from '../common/content-guard.service';
 import { AuthUser, CurrentUser, Roles } from '../common/decorators';
 import { orderForViewer } from '../orders/order-view';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,7 +34,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class ProposalsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly guard: ContentGuardService,
+  ) {}
 
   async create(projectId: string, freelancerId: string, dto: CreateProposalDto) {
     const project = await this.prisma.project.findUnique({ where: { id: projectId } });
@@ -43,16 +48,22 @@ export class ProposalsService {
       where: { projectId_freelancerId: { projectId, freelancerId } },
     });
     if (exists) throw new ConflictException('already_proposed');
-    return this.prisma.proposal.create({
-      data: {
-        projectId,
-        freelancerId,
-        coverLetter: dto.coverLetter.trim(),
-        priceMinor: dto.price * 100,
-        currency: project.currency,
-        deadlineDays: dto.deadlineDays,
-      },
+    const screened = this.guard.screen(dto.coverLetter.trim());
+    const proposal = await this.prisma.$transaction(async (tx) => {
+      const p = await tx.proposal.create({
+        data: {
+          projectId,
+          freelancerId,
+          coverLetter: screened.text,
+          priceMinor: dto.price * 100,
+          currency: project.currency,
+          deadlineDays: dto.deadlineDays,
+        },
+      });
+      await this.guard.flag(tx, { userId: freelancerId, source: ContentSource.PROPOSAL, entityId: p.id }, screened);
+      return p;
     });
+    return { ...proposal, contactsHidden: screened.masked };
   }
 
   /** Employer (owner) and staff see every proposal; a freelancer sees only their own. */

@@ -43,10 +43,10 @@ export function ProjectActions(props: { projectId: string; employerId: string; s
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     try {
-      await api(`/projects/${props.projectId}/proposals`, {
+      const res = await api<{ contactsHidden?: boolean }>(`/projects/${props.projectId}/proposals`, {
         json: { coverLetter: f.get('coverLetter'), price: Number(f.get('price')), deadlineDays: Number(f.get('deadlineDays')) },
       });
-      setMsg(t('proposals.sent'));
+      setMsg(res.contactsHidden ? `${t('proposals.sent')} ${t('common.contactsHidden')}` : t('proposals.sent'));
       load();
     } catch {
       setMsg(t('auth.errors.generic'));

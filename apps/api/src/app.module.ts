@@ -8,6 +8,7 @@ import { AdminModule } from './admin/admin.module';
 import { AuthGuard, RolesGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './common/audit.service';
+import { ContentGuardModule } from './common/content-guard.service';
 import { LegalModule } from './legal/legal.module';
 import { ModerationModule } from './moderation/moderation.module';
 import { OrdersModule } from './orders/orders.module';
@@ -24,6 +25,7 @@ import { ReportsModule } from './reports/reports.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     AuditModule,
+    ContentGuardModule,
     AuthModule,
     LegalModule,
     ProjectsModule,

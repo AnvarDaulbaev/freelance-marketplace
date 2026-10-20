@@ -1,11 +1,12 @@
 import {
   Body, Controller, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, Post, Query,
 } from '@nestjs/common';
-import { ProjectStatus, Role } from '@prisma/client';
+import { ContentSource, ProjectStatus, Role } from '@prisma/client';
 import { Throttle } from '@nestjs/throttler';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
 import { MAX_AMOUNT_SOM } from '../common/limits';
+import { ContentGuardService } from '../common/content-guard.service';
 import { AuthUser, CurrentUser, Public, Roles } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -61,7 +62,7 @@ const STAFF: Role[] = [Role.ADMIN, Role.MODERATOR];
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly guard: ContentGuardService) {}
 
   async list(query: ListQuery) {
     const page = query.page ?? 1;
@@ -109,17 +110,24 @@ export class ProjectsService {
     return project;
   }
 
-  create(employerId: string, dto: CreateProjectDto) {
-    return this.prisma.project.create({
-      data: {
-        employerId,
-        title: dto.title.trim(),
-        description: dto.description.trim(),
-        categoryId: dto.categoryId,
-        budgetMinor: dto.budget != null ? dto.budget * 100 : null,
-        deadlineDays: dto.deadlineDays,
-      },
+  async create(employerId: string, dto: CreateProjectDto) {
+    const title = this.guard.screen(dto.title.trim());
+    const description = this.guard.screen(dto.description.trim());
+    const project = await this.prisma.$transaction(async (tx) => {
+      const p = await tx.project.create({
+        data: {
+          employerId,
+          title: title.text,
+          description: description.text,
+          categoryId: dto.categoryId,
+          budgetMinor: dto.budget != null ? dto.budget * 100 : null,
+          deadlineDays: dto.deadlineDays,
+        },
+      });
+      await this.guard.flag(tx, { userId: employerId, source: ContentSource.PROJECT, entityId: p.id }, title, description);
+      return p;
     });
+    return { ...project, contactsHidden: title.masked || description.masked };
   }
 
   mine(employerId: string) {

@@ -132,6 +132,7 @@
       "invalid_credentials": "Wrong email or password",
       "account_blocked": "Your account is blocked. Please contact support.",
       "email_taken": "This email is already registered",
+      "name_has_digits": "Name cannot contain digits",
       "legal_docs_required": "You need to accept all documents",
       "generic": "Something went wrong. Please try again.",
       "wrong_password": "Current password is incorrect"
@@ -207,6 +208,7 @@
     "cookieOk": "Got it"
   },
   "common": {
+    "contactsHidden": "Contacts were hidden: sharing contacts and paying outside the platform is not allowed. Please use the order chat.",
     "save": "Save",
     "cancel": "Cancel",
     "loading": "Loading…",

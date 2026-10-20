@@ -34,6 +34,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [order, setOrder] = useState<Order | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [error, setError] = useState('');
+  const [contactsHidden, setContactsHidden] = useState(false);
 
   const load = useCallback(() => {
     api<Order>(`/orders/${id}`).then(setOrder).catch(() => setError(tc('notFound')));
@@ -126,6 +127,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             </div>
           ))}
         </div>
+        {contactsHidden && <p className="hint">{tc('contactsHidden')}</p>}
         {canChat && (
           <form
             className="composer"
@@ -134,7 +136,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               const form = e.currentTarget;
               const body = new FormData(form).get('body');
               if (!body) return;
-              await api(`/orders/${id}/messages`, { json: { body } });
+              const res = await api<{ contactsHidden?: boolean }>(`/orders/${id}/messages`, { json: { body } });
+              setContactsHidden(!!res.contactsHidden);
               form.reset();
               load();
             }}

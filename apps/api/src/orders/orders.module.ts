@@ -4,9 +4,10 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Throttle } from '@nestjs/throttler';
-import { Order, OrderStatus, Prisma, ProjectStatus, Role } from '@prisma/client';
+import { ContentSource, Order, OrderStatus, Prisma, ProjectStatus, Role } from '@prisma/client';
 import { IsInt, IsOptional, IsString, Length, Max, Min } from 'class-validator';
 import { AuditService } from '../common/audit.service';
+import { ContentGuardService, FLAG_ONLY_STATUSES } from '../common/content-guard.service';
 import { AuthUser, CurrentUser, Roles } from '../common/decorators';
 import { PrismaService } from '../prisma/prisma.service';
 import { orderForViewer } from './order-view';
@@ -52,7 +53,11 @@ const AUTO_ACCEPT_DAYS = Number(process.env.AUTO_ACCEPT_DAYS ?? 3);
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
 
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly guard: ContentGuardService,
+  ) {}
 
   actorOf(order: Order, user: AuthUser): OrderActor | null {
     if (order.employerId === user.id) return 'employer';
@@ -91,14 +96,15 @@ export class OrdersService {
 
   /**
    * Runs one state-machine transition atomically. `inTx` runs inside the same
-   * transaction for side effects that must succeed or fail together with it.
+   * transaction for side effects that must succeed or fail together with it;
+   * it gets the note after contact screening.
    */
   async act(
     id: string,
     user: AuthUser | null,
     action: Exclude<OrderAction, 'resolve'>,
     note?: string,
-    inTx?: (tx: Prisma.TransactionClient) => Promise<unknown>,
+    inTx?: (tx: Prisma.TransactionClient, note?: string) => Promise<unknown>,
   ) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException();
@@ -108,6 +114,11 @@ export class OrdersService {
     const t = TRANSITIONS[action];
     const allowed = action === 'cancel' ? canCancel(order.status, actor) : t.by.includes(actor) && t.from.includes(order.status);
     if (!allowed) throw new BadRequestException({ message: 'transition_not_allowed', status: order.status, action });
+
+    // Notes are shown to the other party, so they are a chat channel too.
+    const isParty = actor === 'employer' || actor === 'freelancer';
+    const screened = note && isParty ? this.guard.screen(note, !FLAG_ONLY_STATUSES.includes(order.status)) : null;
+    if (screened) note = screened.text;
 
     const now = new Date();
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -128,10 +139,13 @@ export class OrdersService {
       });
       if (count === 0) throw new BadRequestException('order_changed_concurrently');
       await tx.orderEvent.create({ data: { orderId: id, actorId: user?.id, from: order.status, to: t.to, note } });
+      if (screened) {
+        await this.guard.flag(tx, { userId: user!.id, source: ContentSource.ORDER_NOTE, entityId: id, orderId: id }, screened);
+      }
       if (TERMINAL.includes(t.to)) {
         await tx.project.update({ where: { id: order.projectId }, data: { status: ProjectStatus.CLOSED } });
       }
-      if (inTx) await inTx(tx);
+      if (inTx) await inTx(tx, note);
       // TODO(payments): COMPLETED -> release escrow to freelancer wallet minus commission;
       // CANCELLED after funding -> refund escrow to employer. Write LedgerEntry rows here.
       return tx.order.findUniqueOrThrow({ where: { id } });
@@ -141,8 +155,8 @@ export class OrdersService {
   }
 
   openDispute(id: string, user: AuthUser, reason: string) {
-    return this.act(id, user, 'dispute', reason, (tx) =>
-      tx.dispute.create({ data: { orderId: id, openedById: user.id, reason } }),
+    return this.act(id, user, 'dispute', reason, (tx, screenedReason) =>
+      tx.dispute.create({ data: { orderId: id, openedById: user.id, reason: screenedReason ?? reason } }),
     );
   }
 
@@ -179,7 +193,13 @@ export class OrdersService {
     if (!actor) throw new NotFoundException();
     // Staff may read the chat for disputes but never write into it.
     if (actor !== 'employer' && actor !== 'freelancer') throw new ForbiddenException();
-    return this.prisma.message.create({ data: { orderId: id, authorId: user.id, body } });
+    const screened = this.guard.screen(body, !FLAG_ONLY_STATUSES.includes(order.status));
+    const message = await this.prisma.$transaction(async (tx) => {
+      const m = await tx.message.create({ data: { orderId: id, authorId: user.id, body: screened.text } });
+      await this.guard.flag(tx, { userId: user.id, source: ContentSource.MESSAGE, entityId: m.id, orderId: id }, screened);
+      return m;
+    });
+    return { ...message, contactsHidden: screened.masked };
   }
 
   async review(id: string, user: AuthUser, dto: ReviewDto) {
@@ -188,15 +208,23 @@ export class OrdersService {
     const actor = this.actorOf(order, user);
     if (actor !== 'employer' && actor !== 'freelancer') throw new ForbiddenException();
     if (order.status !== OrderStatus.COMPLETED) throw new BadRequestException('order_not_completed');
-    return this.prisma.review.create({
-      data: {
-        orderId: id,
-        authorId: user.id,
-        targetId: actor === 'employer' ? order.freelancerId : order.employerId,
-        rating: dto.rating,
-        text: dto.text,
-      },
+    const screened = dto.text ? this.guard.screen(dto.text) : null;
+    const review = await this.prisma.$transaction(async (tx) => {
+      const r = await tx.review.create({
+        data: {
+          orderId: id,
+          authorId: user.id,
+          targetId: actor === 'employer' ? order.freelancerId : order.employerId,
+          rating: dto.rating,
+          text: screened?.text,
+        },
+      });
+      if (screened) {
+        await this.guard.flag(tx, { userId: user.id, source: ContentSource.REVIEW, entityId: r.id, orderId: id }, screened);
+      }
+      return r;
     });
+    return { ...review, contactsHidden: !!screened?.masked };
   }
 }
 

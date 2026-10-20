@@ -59,6 +59,7 @@ model User {
   wallets         Wallet[]
   payouts         Payout[]
   payoutMethods   PayoutMethod[]
+  contentFlags    ContentFlag[]
 }
 
 // --- Legal: proof that a user accepted a specific version of a document ---
@@ -291,6 +292,48 @@ model Report {
   project    Project? @relation(fields: [projectId], references: [id])
 
   @@index([status, createdAt])
+}
+
+// --- Off-platform detection ---
+//
+// A hit of the contact detector (@fm/shared contacts.ts) in user content.
+// The stored entity keeps the masked text; the original is kept here for
+// moderators and disputes only.
+
+enum ContentSource {
+  MESSAGE
+  PROPOSAL
+  PROJECT
+  ORDER_NOTE
+  REVIEW
+}
+
+enum ContentFlagStatus {
+  OPEN
+  CONFIRMED // moderator agrees it was an attempt to go off-platform
+  DISMISSED // false positive
+}
+
+model ContentFlag {
+  id           String            @id @default(cuid())
+  userId       String
+  source       ContentSource
+  entityId     String // Message/Proposal/Project/Review id; Order id for ORDER_NOTE
+  orderId      String?
+  kinds        String[] // ContactKind values from @fm/shared
+  matches      Json // [{ kind, value }]
+  original     String
+  masked       Boolean
+  status       ContentFlagStatus @default(OPEN)
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([source, entityId])
 }
 
 // Every staff action and sensitive change. Needed to answer complaints and

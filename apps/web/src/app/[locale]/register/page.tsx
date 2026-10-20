@@ -56,7 +56,7 @@ export default function RegisterPage() {
           <label className="check"><input type="radio" name="role" value="FREELANCER" required /><span>{t('auth.roleFreelancer')}</span></label>
         </div>
       </fieldset>
-      <label>{t('auth.name')}<input name="name" required minLength={2} maxLength={80} /></label>
+      <label>{t('auth.name')}<input name="name" required minLength={2} maxLength={80} pattern="\P{N}*" title={t('auth.errors.name_has_digits')} /></label>
       <label>{t('auth.email')}<input name="email" type="email" required autoComplete="email" /></label>
       <label>
         {t('auth.password')}
